@@ -3,6 +3,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --tw-lab-l: initial;
+  --tw-lab-a: initial;
+  --tw-lab-b: initial;
 }
 
 @theme inline {
