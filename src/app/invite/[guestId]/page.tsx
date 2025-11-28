@@ -5,60 +5,71 @@ import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import html2canvas from "html2canvas";
+import * as htmlToImage from "html-to-image";
 import Image from "next/image";
 
 export default function InvitePage() {
   const { guestId } = useParams();
 
   const [guest, setGuest] = useState<any>(null);
-  const [eventData, setEventData] = useState<any>(null);
+  const [event, setEvent] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const cardRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  function applyVariables(text: string) {
+    if (!guest || !event) return text;
+
+    return text
+      .replace(/{{guestName}}/g, guest.name)
+      .replace(/{{eventName}}/g, event.name)
+      .replace(/{{eventDate}}/g, event.date)
+      .replace(/{{eventLocal}}/g, event.local ?? "")
+      .replace(/{{guestId}}/g, guestId as string);
+  }
 
   useEffect(() => {
     if (!guestId) return;
 
     async function loadInvite() {
+      setLoading(true);
+
       try {
         const eventsSnap = await getDocs(collection(db, "events"));
 
         let foundGuest = null;
-        let eventIdFound = null;
+        let foundEventId = null;
 
-        for (const ev of eventsSnap.docs) {
-          const eventId = ev.id;
+        for (const eventDoc of eventsSnap.docs) {
+          const eventId = eventDoc.id;
 
           const guestsSnap = await getDocs(
             collection(db, "events", eventId, "guests")
           );
 
-          const g = guestsSnap.docs.find((d) => d.id === guestId);
-
-          if (g) {
-            foundGuest = g.data();
-            eventIdFound = eventId;
+          const match = guestsSnap.docs.find((d) => d.id === guestId);
+          if (match) {
+            foundGuest = match.data();
+            foundEventId = eventId;
             break;
           }
         }
 
-        if (!foundGuest || !eventIdFound) {
+        if (!foundGuest || !foundEventId) {
           setLoading(false);
           return;
         }
 
-        setGuest(foundGuest);
+        setGuest({ id: guestId, ...foundGuest });
 
-        const evSnap = await getDoc(doc(db, "events", eventIdFound));
-        if (evSnap.exists()) setEventData(evSnap.data());
+        const eventSnap = await getDoc(doc(db, "events", foundEventId));
+        if (eventSnap.exists()) setEvent(eventSnap.data());
 
-        const cfgSnap = await getDoc(
-          doc(db, "events", eventIdFound, "inviteTemplate", "config")
+        const configSnap = await getDoc(
+          doc(db, "events", foundEventId, "inviteTemplate", "config")
         );
-
-        if (cfgSnap.exists()) setConfig(cfgSnap.data());
+        if (configSnap.exists()) setConfig(configSnap.data());
 
         setLoading(false);
       } catch (e) {
@@ -71,18 +82,29 @@ export default function InvitePage() {
   }, [guestId]);
 
   async function handleDownload() {
-    if (!cardRef.current) return;
+    if (!canvasRef.current) return;
 
-    const canvas = await html2canvas(cardRef.current, {
-      scale: 3,
-      useCORS: true,
-      backgroundColor: null,
-    });
+    const originalTransform = canvasRef.current.style.transform;
 
-    const link = document.createElement("a");
-    link.download = `convite-${guest?.name}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+    canvasRef.current.style.transform = "scale(1)";
+
+    try {
+      const dataUrl = await htmlToImage.toPng(canvasRef.current, {
+        cacheBust: true,
+        quality: 1,
+        pixelRatio: 3,
+      });
+
+      const link = document.createElement("a");
+      link.download = `convite-${guest.name}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("Erro ao exportar convite", err);
+      alert("Erro ao exportar convite.");
+    }
+
+    canvasRef.current.style.transform = originalTransform;
   }
 
   if (loading) {
@@ -93,104 +115,93 @@ export default function InvitePage() {
     );
   }
 
-  if (!guest || !eventData) {
+  if (!guest || !event || !config) {
     return (
       <div className="min-h-screen flex items-center justify-center text-center px-6 text-slate-300">
-        <p>Convite não encontrado.</p>
+        Convite não encontrado.
       </div>
     );
   }
 
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 480;
+  const scale = isMobile ? window.innerWidth / config.canvasWidth : 1;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center px-4 py-8">
-      <h1 className="text-xl mb-6 text-center">Seu convite 🎉</h1>
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center px-4 py-10">
+      <h1 className="text-xl mb-6">Seu convite 🎉</h1>
 
       <div
-        ref={cardRef}
-        className="w-full max-w-md rounded-3xl p-6 shadow-xl text-center relative overflow-hidden flex flex-col min-h-[600px] items-center justify-center"
-        style={{
-          backgroundColor: config?.baseColor ?? "#ffffff",
-          backgroundImage: config?.backgroundImage
-            ? `url(${config.backgroundImage})`
-            : "none",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          borderRadius: config?.borderStyle === "rounded" ? "32px" : "4px",
-          fontFamily:
-            config?.font === "handwritten"
-              ? "Caveat"
-              : config?.font === "fun"
-              ? "Fredoka"
-              : config?.font === "elegant"
-              ? "Playfair Display"
-              : "inherit",
-        }}
+        className="w-full flex justify-center overflow-auto md:overflow-visible"
+        style={{ touchAction: "pan-y pinch-zoom" }}
       >
-        {config?.decorations?.balloons && (
-          <Image
-            src="/decorations/balloons.png"
-            alt="balões"
-            width={700}
-            height={200}
-            className="absolute top-0 left-0 opacity-80 pointer-events-none z-0"
-          />
-        )}
-
-        {config?.decorations?.confetti && (
-          <Image
-            src="/decorations/confetti.png"
-            alt="confete"
-            width={700}
-            height={300}
-            className="absolute top-0 right-0 opacity-70 pointer-events-none z-0"
-          />
-        )}
-
-        {config?.decorations?.stars && (
-          <Image
-            src="/decorations/stars.png"
-            alt="estrelas"
-            width={700}
-            height={200}
-            className="absolute bottom-0 right-0 opacity-70 pointer-events-none z-0"
-          />
-        )}
-
-        <div className="relative z-20 flex flex-col items-center">
-          <p className="text-sm" style={{ color: config?.textColor }}>
-            Você foi convidado para
-          </p>
-
-          <h2
-            className="text-3xl font-bold mt-2"
-            style={{ color: config?.titleColor }}
-          >
-            {eventData.name}
-          </h2>
-
-          <p className="mt-4 text-xl" style={{ color: config?.nameColor }}>
-            🎈 Convidado: {guest.name}
-          </p>
-
-          <p className="text-sm mt-1" style={{ color: config?.textColor }}>
-            {eventData.date
-              ? new Date(eventData.date).toLocaleDateString("pt-BR", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })
-              : "Data a definir"}
-          </p>
-
-          {eventData.local && (
-            <p className="text-sm mt-1" style={{ color: config?.textColor }}>
-              📍 Local: {eventData.local}
-            </p>
-          )}
-
-          <p className="mt-6 text-sm" style={{ color: config?.textColor }}>
-            Estamos ansiosos para celebrar com você! 🎉✨
-          </p>
+        <div
+          ref={canvasRef}
+          style={{
+            transform: `scale(${scale})`,
+            transformOrigin: "top center",
+            width: config.canvasWidth,
+            height: config.canvasHeight,
+            backgroundColor: config.baseColor,
+            backgroundImage: config.backgroundImage
+              ? `url(${config.backgroundImage})`
+              : "none",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+          className="relative shadow-xl rounded-3xl overflow-hidden border border-slate-800"
+        >
+          {config.elements
+            ?.slice()
+            .sort((a: any, b: any) => a.zIndex - b.zIndex)
+            .map((el: any) => (
+              <div
+                key={el.id}
+                style={{
+                  position: "absolute",
+                  top: el.y,
+                  left: el.x,
+                  width: el.width,
+                  height: el.height,
+                  zIndex: el.zIndex,
+                  pointerEvents: "none",
+                }}
+              >
+                {el.type === "text" ? (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent:
+                        el.align === "left"
+                          ? "flex-start"
+                          : el.align === "right"
+                          ? "flex-end"
+                          : "center",
+                      textAlign: el.align,
+                      fontSize: el.fontSize,
+                      color: el.color,
+                      whiteSpace: "pre-wrap",
+                      fontFamily: el.fontFamily,
+                      fontWeight: el.fontWeight,
+                      fontStyle: el.fontStyle,
+                    }}
+                  >
+                    {applyVariables(el.text)}
+                  </div>
+                ) : (
+                  <Image
+                    src={el.url}
+                    alt=""
+                    width={el.width}
+                    height={el.height}
+                    className="object-contain"
+                    style={{ opacity: el.opacity }}
+                  />
+                )}
+              </div>
+            ))}
         </div>
       </div>
 
@@ -201,10 +212,10 @@ export default function InvitePage() {
         Baixar convite
       </button>
 
-      {eventData.local && (
+      {event.local && (
         <a
           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-            eventData.local
+            event.local
           )}`}
           target="_blank"
           rel="noopener noreferrer"

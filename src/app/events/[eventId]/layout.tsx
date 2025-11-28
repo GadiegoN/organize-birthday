@@ -9,6 +9,7 @@ import {
   DollarSign,
   Image as ImageIcon,
   Columns3Cog,
+  UserPlus,
 } from "lucide-react";
 
 export default function EventLayout({ children }: { children: ReactNode }) {
@@ -50,7 +51,7 @@ export default function EventLayout({ children }: { children: ReactNode }) {
     {
       label: "Usuários",
       href: `/events/${eventId}/access`,
-      icon: <Columns3Cog size={20} />,
+      icon: <UserPlus size={20} />,
     },
   ];
 

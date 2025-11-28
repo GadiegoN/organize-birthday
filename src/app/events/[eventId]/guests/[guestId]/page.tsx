@@ -51,6 +51,15 @@ export default function InvitationPage() {
     );
   }
 
+  function applyVariables(text: string, event: any, guest: any) {
+    return text
+      .replace(/{{guestName}}/g, guest.name)
+      .replace(/{{eventName}}/g, event.name)
+      .replace(/{{eventDate}}/g, event.date)
+      .replace(/{{eventLocal}}/g, event.local ?? "")
+      .replace(/{{guestId}}/g, guest.id ?? "");
+  }
+
   async function handleShare() {
     const publicUrl = `${window.location.origin}/invite/${guestId}`;
 
@@ -72,84 +81,70 @@ export default function InvitationPage() {
 
       <div
         id="invite-card"
-        className="w-full max-w-md shadow-xl text-center relative overflow-hidden p-6 min-h-[700px] flex items-center justify-center"
+        className="relative shadow-xl rounded-3xl overflow-hidden border border-slate-800"
         style={{
-          backgroundColor: config?.baseColor ?? "#ffffff",
-          backgroundImage: config?.backgroundImage
+          width: config.canvasWidth,
+          height: config.canvasHeight,
+          backgroundColor: config.baseColor,
+          backgroundImage: config.backgroundImage
             ? `url(${config.backgroundImage})`
             : "none",
           backgroundSize: "cover",
           backgroundPosition: "center",
-          borderRadius: config?.borderStyle === "rounded" ? "32px" : "4px",
-          fontFamily:
-            config?.font === "handwritten"
-              ? "Caveat"
-              : config?.font === "fun"
-              ? "Fredoka"
-              : config?.font === "elegant"
-              ? "Playfair Display"
-              : "inherit",
         }}
       >
-        {config?.decorations?.balloons && (
-          <Image
-            src="/decorations/balloons.png"
-            alt="balões"
-            width={700}
-            height={200}
-            className="absolute top-0 left-0 opacity-80 pointer-events-none z-0"
-          />
-        )}
-
-        {config?.decorations?.confetti && (
-          <Image
-            src="/decorations/confetti.png"
-            alt="confete"
-            width={700}
-            height={300}
-            className="absolute top-0 right-0 opacity-70 pointer-events-none z-0"
-          />
-        )}
-
-        {config?.decorations?.stars && (
-          <Image
-            src="/decorations/stars.png"
-            alt="estrelas"
-            width={700}
-            height={200}
-            className="absolute bottom-0 right-0 opacity-70 pointer-events-none z-0"
-          />
-        )}
-
-        {/* TEXTO EM CIMA DAS DECS */}
-        <div className="relative z-20 flex flex-col items-center">
-          <p style={{ color: config?.textColor }}>Você foi convidado para</p>
-
-          <h2
-            className="text-3xl font-bold mt-2"
-            style={{ color: config?.titleColor }}
-          >
-            {event.name}
-          </h2>
-
-          <p className="mt-4 text-xl" style={{ color: config?.nameColor }}>
-            🎈 Convidado: {guest.name}
-          </p>
-
-          <p className="text-sm mt-1" style={{ color: config?.textColor }}>
-            {event.date}
-          </p>
-
-          {event.local && (
-            <p className="text-sm mt-1" style={{ color: config?.textColor }}>
-              📍 Local: {event.local}
-            </p>
-          )}
-
-          <p className="mt-6 text-sm" style={{ color: config?.textColor }}>
-            Estamos ansiosos para celebrar com você! 🎉✨
-          </p>
-        </div>
+        {config.elements
+          ?.slice()
+          .sort((a: any, b: any) => a.zIndex - b.zIndex)
+          .map((el: any) => (
+            <div
+              key={el.id}
+              style={{
+                position: "absolute",
+                top: el.y,
+                left: el.x,
+                width: el.width,
+                height: el.height,
+                zIndex: el.zIndex,
+                pointerEvents: "none",
+              }}
+            >
+              {el.type === "text" ? (
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent:
+                      el.align === "left"
+                        ? "flex-start"
+                        : el.align === "right"
+                        ? "flex-end"
+                        : "center",
+                    textAlign: el.align,
+                    fontSize: el.fontSize,
+                    color: el.color,
+                    whiteSpace: "pre-wrap",
+                    fontFamily: el.fontFamily,
+                    fontWeight: el.fontWeight,
+                    fontStyle: el.fontStyle,
+                  }}
+                >
+                  {applyVariables(el.text, event, guest)}
+                </div>
+              ) : (
+                <Image
+                  src={el.url}
+                  alt=""
+                  width={el.width}
+                  height={el.height}
+                  className="object-contain"
+                  style={{ opacity: el.opacity }}
+                />
+              )}
+            </div>
+          ))}
       </div>
 
       <button

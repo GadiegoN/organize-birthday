@@ -31,7 +31,7 @@ export default function UploadButton({ onUpload }: any) {
 
   return (
     <label className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-sm cursor-pointer">
-      {uploading ? "Enviando..." : "Enviar imagem"}
+      {uploading ? "Enviando..." : "Selecionar"}
       <input type="file" className="hidden" onChange={handleFile} />
     </label>
   );
