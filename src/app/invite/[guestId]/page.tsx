@@ -7,6 +7,7 @@ import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import * as htmlToImage from "html-to-image";
 import Image from "next/image";
+import { formatDate } from "@/lib/format-date";
 
 export default function InvitePage() {
   const { guestId } = useParams();
@@ -24,7 +25,7 @@ export default function InvitePage() {
     return text
       .replace(/{{guestName}}/g, guest.name)
       .replace(/{{eventName}}/g, event.name)
-      .replace(/{{eventDate}}/g, event.date)
+      .replace(/{{eventDate}}/g, formatDate(event.date))
       .replace(/{{eventLocal}}/g, event.local ?? "")
       .replace(/{{guestId}}/g, guestId as string);
   }
