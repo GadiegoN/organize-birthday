@@ -259,7 +259,7 @@ export default function EventDashboard() {
         </Link>
 
         <Link
-          href={`/events/${event.id}/inspirations`}
+          href={`/events/${event.id}/references`}
           className="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center hover:bg-slate-800"
         >
           Inspirações
