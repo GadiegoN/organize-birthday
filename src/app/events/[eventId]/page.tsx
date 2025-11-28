@@ -110,7 +110,8 @@ export default function EventDashboard() {
   const budget = event.budget || 0;
   const spentPercent = budget ? Math.min((totalSpent / budget) * 100, 100) : 0;
 
-  const completedTasks = tasks.filter((t) => t.done).length;
+  const completedTasks = tasks.filter((t) => t.status === "done").length;
+
   const tasksPercent =
     tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
 
